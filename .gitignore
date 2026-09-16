@@ -1,0 +1,23 @@
+# Local tooling and credentials
+.venv/
+.env
+.env.*
+!.env.example
+.local/
+.cache/
+__pycache__/
+*.py[cod]
+node_modules/
+dist/
+*.log
+*.pem
+*.key
+*.sql
+*.sqlite*
+.DS_Store
+Thumbs.db
+# Large editable art stays outside the public repo until a storage policy is agreed.
+*.blend
+*.blend1
+*.blend2
+renders/

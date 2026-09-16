@@ -1,0 +1,8 @@
+# Candidate for the current static site ONLY. Verify on Hostinger before merge.
+# Keep this exact public-URL allowlist aligned with deploy/public-files.txt.
+# Do not wrap in IfModule: unsupported rewrite should fail closed, not expose files.
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+RewriteEngine On
+RewriteRule ^(?:index\.html|styles\.css|lightspeed\.js|favicon\.svg|assets/tachos-logo\.png)?$ - [END]
+RewriteRule ^ - [F,END]
