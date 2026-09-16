@@ -1,0 +1,6 @@
+# Only these reviewed files are included in local previews/release artifacts.
+index.html
+styles.css
+lightspeed.js
+favicon.svg
+assets/tachos-logo.png
