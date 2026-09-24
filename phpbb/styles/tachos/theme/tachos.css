@@ -1,0 +1,11 @@
+html, body { background:#eae5d7; color:#142923; font:16px/1.6 Arial,Helvetica,sans-serif; }
+#wrap { max-width:none; margin:0; padding:32px 7vw; border:0; border-radius:0; background:transparent; }
+.tachos-header a {color:#142923}.tachos-header img {max-width:100%}.hero h1 {color:#f7f3e9;font-family:Arial,Helvetica,sans-serif}.hero p {margin-bottom:0}.hero .intro {margin:30px 0}
+.tachos-short {background:#142923;color:#f7f3e9;padding:22px 7vw}.tachos-short p {margin:0;font-size:20px}
+.tachos-board-heading {display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}.tachos-board-heading h2 {margin:0;font:400 28px/1.3 Arial}.tachos-board-heading p {margin:0;color:#526158;font-size:14px}
+.navbar {background:#dfd9c9;border-radius:0;padding:10px 16px}.forabg,.forumbg {background:#142923;border-radius:2px;padding:0 1px 1px}.forabg .header,.forumbg .header {padding:12px}
+.bg1,.bg2,.bg3,ul.forums {background:#f5f1e7;background-image:none}.panel {background:#dfd9c9;color:#142923}.post {border:1px solid #14292328;border-radius:2px}
+ul.topiclist li.row {border-color:#14292328}li.row:hover {background:#e9e3d4}a.forumtitle,a.topictitle {font:600 18px/1.5 Arial;color:#142923}a {color:#2357a8}.content {font-size:16px;line-height:1.65}.forum-description,.topiclist dt,.topiclist dd {font-size:14px}
+.button,input.button1,input.button2 {background:#142923;color:#f7f3e9;border:1px solid #142923;border-radius:3px;text-shadow:none;font-size:14px}.button:hover {background:#27493e;color:#fff}.inputbox {background:#fffdf7;color:#142923;border-color:#829085;font-size:16px}
+.copyright,.footer-row,.linklist,.stat-block {font-size:14px}a:focus-visible,button:focus-visible,input:focus-visible {outline:3px solid #397dff;outline-offset:3px}.tachos-footer {border-top:1px solid #14292328}
+@media(max-width:700px){#wrap {padding:24px 5vw}.tachos-board-heading {display:block}.tachos-board-heading p {margin-top:8px}.tachos-short {padding:20px 5vw}.tachos-header {gap:12px}.tachos-header>a:last-child {font-size:14px}}

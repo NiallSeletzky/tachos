@@ -1,0 +1,17 @@
+# Runtime and confidential material do not belong in this public repository.
+.env
+.env.*
+!.env.example
+config.php
+*.sql
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.log
+backups/
+uploads/
+files/
+store/
+cache/
+private/
+node_modules/

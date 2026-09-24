@@ -1,0 +1,27 @@
+:root { --paper:#eae5d7; --ink:#142923; --white:#f7f3e9; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:Arial,Helvetica,sans-serif; }
+a { color:inherit; }
+header.tachos-header { min-height:112px; padding:18px 5vw; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.brand { width:240px; max-width:60%; display:block; }
+.brand img { display:block; width:100%; mix-blend-mode:multiply; }
+header.tachos-header>a:last-child { font-size:14px; text-decoration:none; border-bottom:1px solid #8b9487; padding:12px 0; }
+.hero { position:relative; isolation:isolate; overflow:hidden; background:radial-gradient(ellipse at 78% 52%,#534864 0%,#233932 36%,#101f1e 80%); color:var(--white); min-height:700px; display:flex; flex-direction:column; justify-content:space-between; }
+.hero canvas,.hero .shade { position:absolute; inset:0; width:100%; height:100%; z-index:-1; }
+.shade { background:linear-gradient(90deg,rgba(11,24,22,.94),rgba(11,24,22,.62) 43%,transparent 76%); }
+.copy { padding:clamp(60px,7vw,100px) 7vw 68px; }
+.eyebrow { margin:0 0 42px; font-size:12px; letter-spacing:.2em; line-height:1.6; color:#c7cbbf; }
+.hero h1 { font-weight:400; font-size:clamp(46px,6.5vw,96px); line-height:1.03; letter-spacing:-.055em; margin:0; }
+.intro { font-size:clamp(16px,1.5vw,20px); line-height:1.6; max-width:380px; margin:30px 0; color:#d1d4cb; }
+.email { display:inline-flex; align-items:center; gap:36px; font-size:18px; text-decoration:none; padding:12px 0; border-bottom:1px solid #8a9392; }
+.email:hover { border-color:#edb99d; color:#edb99d; }
+.hero-bottom { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 7vw; padding:24px 0; border-top:1px solid #ffffff26; }
+.hero-bottom p { font-size:12px; line-height:1.8; letter-spacing:.12em; margin:0; color:#d1d4cb; }
+a:focus-visible,button:focus-visible { outline:2px solid #f6bb91; outline-offset:5px; }
+.notice { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px 28px; padding:30px 7vw; border-bottom:1px solid #14292328; }
+.notice p { font-size:14px; line-height:1.6; margin:0; }
+.notice p+p { color:#526158; }
+footer.tachos-footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; padding:26px 7vw 36px; font-size:12px; line-height:1.8; color:#526158; }
+footer.tachos-footer p { margin:0; }
+footer.tachos-footer>p { letter-spacing:.08em; color:#142923; }
+@media(max-width:600px) { header.tachos-header{min-height:90px;padding:14px 7vw}.brand{width:200px}.hero{min-height:690px}.copy{padding-top:58px}.shade{background:linear-gradient(90deg,#0b1816e8,#0b181665)}.eyebrow{margin-bottom:34px}.hero-bottom{align-items:flex-start;flex-direction:column;gap:16px}.hero-bottom p{letter-spacing:.03em}.hero h1{font-size:clamp(42px,9vw,58px)} }
