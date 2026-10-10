@@ -14,3 +14,6 @@ Static HTML/CSS/JS implementation of the approved moustache-themed design. Mobil
 - Hero artwork is rendered with CSS; the supplied approved mockup is included as a reference image.
 - The current code takes design cues from the approved illustration; it is not a pixel-perfect reproduction.
 - No automatic changes have been made to IONOS hosting.
+
+## Mandatory brand consistency — all tachos.co.uk pages
+Read and follow [BRAND-STANDARD.md](BRAND-STANDARD.md) before modifying any public page, forum theme, project-execution application, or private client-area interface. Reuse the established CSS design tokens and components; departures require explicit owner approval.
