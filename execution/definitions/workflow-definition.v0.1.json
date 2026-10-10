@@ -1,0 +1,467 @@
+{
+  "version": "0.1",
+  "status": "Design specification - not an executable engine",
+  "stages": [
+    {
+      "id": "S00",
+      "title": "Authorise and define boundaries",
+      "owner": "Sponsor; security authority",
+      "depends_on": [],
+      "outputs": "Project charter; role and authority matrix; information-handling plan",
+      "approvers": "Sponsor and security authority",
+      "source": "2-1 to 2-2; 2-34 to 2-36",
+      "tasks": [
+        {
+          "id": "S00.01",
+          "title": "Confirm mission and project boundary",
+          "action": "Record business outcome, site alias, new build / retrofit / expansion, exclusions and interfaces."
+        },
+        {
+          "id": "S00.02",
+          "title": "Appoint accountable people",
+          "action": "Name sponsor, PM, design leads, operations owner, security authority, commissioning lead and change authority; record deputies."
+        },
+        {
+          "id": "S00.03",
+          "title": "Agree information handling",
+          "action": "Approve repositories, classification labels, photographs, devices, exports, retention and offline working; no restricted site data in this template repository."
+        },
+        {
+          "id": "S00.04",
+          "title": "Establish project mandate",
+          "action": "Record funding envelope, decision rights, contract authority and permission for surveys; distinguish survey authority from installation authority."
+        },
+        {
+          "id": "S00.05",
+          "title": "Create control records",
+          "action": "Assign project ID and initialise requirements, risks, decisions, evidence and document revision registers."
+        }
+      ]
+    },
+    {
+      "id": "S01",
+      "title": "Define requirements and criticality",
+      "owner": "Owner; operations; commissioning lead",
+      "depends_on": [
+        "S00"
+      ],
+      "outputs": "Owner requirements; acceptance strategy; standards applicability register",
+      "approvers": "Owner and operations; security authority",
+      "source": "1-1 to 1-13; 2-6 to 2-9; 3-23",
+      "tasks": [
+        {
+          "id": "S01.01",
+          "title": "Define service requirements",
+          "action": "List supported services, operating hours, planned maintenance windows, outage consequences, recovery time and data-loss objectives."
+        },
+        {
+          "id": "S01.02",
+          "title": "Define capacity and growth",
+          "action": "Record initial and forecast racks, IT load, connectivity, storage and expansion assumptions with units and confidence."
+        },
+        {
+          "id": "S01.03",
+          "title": "Define security outcomes",
+          "action": "Record threat assessment owner, protection objectives, zones, access roles, evidence restrictions and required client accreditation decisions."
+        },
+        {
+          "id": "S01.04",
+          "title": "Agree acceptance before design",
+          "action": "Give each requirement a measurable criterion, verification method, witness, owner and acceptance authority."
+        },
+        {
+          "id": "S01.05",
+          "title": "Select applicable obligations",
+          "action": "Identify jurisdiction, client standards, contract clauses, current adopted editions and specialist verification owners; unresolved applicability blocks affected design release."
+        },
+        {
+          "id": "S01.06",
+          "title": "Approve commissioning scope",
+          "action": "Include power, cooling, controls, security, fire/life safety interfaces, cabling, network and operational readiness as applicable."
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "title": "Survey and assess feasibility",
+      "owner": "Design leads; site operations",
+      "depends_on": [
+        "S01"
+      ],
+      "outputs": "Survey report; baseline inventory; dependency map; option assessment",
+      "approvers": "Design authority and operations",
+      "source": "2-13 to 2-25; 2-32 to 2-33; 3-12 to 3-14",
+      "tasks": [
+        {
+          "id": "S02.01",
+          "title": "Review existing records",
+          "action": "Compare authorised drawings and inventory with observations; mark known, inferred and unverified facts separately."
+        },
+        {
+          "id": "S02.02",
+          "title": "Survey site and delivery routes",
+          "action": "Assess space, floor/loading evidence, rack delivery route, pathways, penetrations and access constraints with competent specialists."
+        },
+        {
+          "id": "S02.03",
+          "title": "Map facilities interfaces",
+          "action": "Obtain verified power capacity and source mapping, cooling capacity, environmental monitoring, fire protection and bonding responsibilities."
+        },
+        {
+          "id": "S02.04",
+          "title": "Trace service dependencies",
+          "action": "Map current network, storage, management and A/B dependencies without disconnecting services; escalate unverified paths."
+        },
+        {
+          "id": "S02.05",
+          "title": "Compare feasible options",
+          "action": "Assess reuse, upgrade, new build and permitted external provision against requirements, risk, lifecycle cost and schedule."
+        },
+        {
+          "id": "S02.06",
+          "title": "Resolve feasibility blockers",
+          "action": "Record unacceptable constraints and required investigations; sponsor chooses proceed, revise or cancel."
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "title": "Develop and baseline design",
+      "owner": "Multidisciplinary design team",
+      "depends_on": [
+        "S02"
+      ],
+      "outputs": "Basis of design; coordinated drawings; specifications; test criteria",
+      "approvers": "Design authority; owner; operations; security; commissioning lead",
+      "source": "2-16 to 2-25; 3-24; 5-1 to 5-11",
+      "tasks": [
+        {
+          "id": "S03.01",
+          "title": "Approve concept design",
+          "action": "Compare options against owner requirements; approve chosen concept and documented residual risks."
+        },
+        {
+          "id": "S03.02",
+          "title": "Coordinate detailed design",
+          "action": "Coordinate structural, electrical, cooling, fire, security, controls and ICT interfaces; verify maintainability and delivery access."
+        },
+        {
+          "id": "S03.03",
+          "title": "Design complete cabling paths",
+          "action": "Specify endpoints, optics, leads, panels, cassettes, trunk strands, polarity, routes, labels and approved test limits."
+        },
+        {
+          "id": "S03.04",
+          "title": "Review common failure modes",
+          "action": "Review shared upstream power, shared routes, controls, carriers and maintenance dependencies; two labels do not prove independence."
+        },
+        {
+          "id": "S03.05",
+          "title": "Review operations and testability",
+          "action": "Commissioning lead checks witness points, isolation boundaries, restoration, test loads and acceptance evidence."
+        },
+        {
+          "id": "S03.06",
+          "title": "Release controlled construction package",
+          "action": "Resolve comments; baseline drawings, bill of materials, requirements and specifications; formally record owner approval."
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "title": "Plan delivery and procure",
+      "owner": "PM; procurement; design team",
+      "depends_on": [
+        "S03"
+      ],
+      "outputs": "WBS; dependency schedule; cost baseline; contract and submittal records",
+      "approvers": "Sponsor; commercial and design authorities",
+      "source": "2-1 to 2-12; 3-1 to 3-8; 3-18 to 3-21; 4-8 to 4-20",
+      "tasks": [
+        {
+          "id": "S04.01",
+          "title": "Build work packages",
+          "action": "Split work by room, system and deliverable; assign owner, prerequisites, effort, resources and acceptance evidence."
+        },
+        {
+          "id": "S04.02",
+          "title": "Baseline schedule and budget",
+          "action": "Include client actions, clearances, long lead items, testing, rework, contingencies and handover; obtain approval."
+        },
+        {
+          "id": "S04.03",
+          "title": "Select qualified suppliers",
+          "action": "Evaluate competence, scope compliance, security obligations, supportability and commercial terms; document selection."
+        },
+        {
+          "id": "S04.04",
+          "title": "Approve submittals and substitutions",
+          "action": "Match products and shop drawings to the baseline; changes require impact assessment before order or installation."
+        },
+        {
+          "id": "S04.05",
+          "title": "Authorise orders and logistics",
+          "action": "Record purchase authority, quantities, delivery dates, secure storage, receipt inspection and defective-item quarantine."
+        },
+        {
+          "id": "S04.06",
+          "title": "Prepare quality and communications plans",
+          "action": "Define inspections, hold points, reporting cadence, escalation, RFI process and document distribution."
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "title": "Release work for installation",
+      "owner": "Site lead; operations; safety and security leads",
+      "depends_on": [
+        "S04"
+      ],
+      "outputs": "Work authorisation; method statement; permits; readiness checklist",
+      "approvers": "Site authority; operations; relevant safety/security authorities",
+      "source": "3-5 to 3-8; 3-12 to 3-21",
+      "tasks": [
+        {
+          "id": "S05.01",
+          "title": "Confirm construction authority",
+          "action": "Obtain notice to proceed or equivalent for this scope; verify current drawings and approved material submittals."
+        },
+        {
+          "id": "S05.02",
+          "title": "Confirm people and access",
+          "action": "Check competence, induction, clearance, escort, tools, permitted devices and supervision."
+        },
+        {
+          "id": "S05.03",
+          "title": "Accept prerequisite facilities",
+          "action": "Obtain relevant trade releases, room readiness, supports, environmental conditions and safe access evidence."
+        },
+        {
+          "id": "S05.04",
+          "title": "Inspect and receive materials",
+          "action": "Check identity, quantity, condition, serials and custody; quarantine discrepancies and update procurement records."
+        },
+        {
+          "id": "S05.05",
+          "title": "Approve method and rollback",
+          "action": "Identify exact assets, steps, impact, stop conditions, safe state, recovery actions, latest rollback time and contacts."
+        },
+        {
+          "id": "S05.06",
+          "title": "Release individual work packages",
+          "action": "Confirm permits and change window still valid, dependencies complete and control-room coordination; otherwise hold."
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "title": "Install and record",
+      "owner": "Authorised installation teams",
+      "depends_on": [
+        "S05"
+      ],
+      "outputs": "Installation inspections; daily log; redlines; asset and connection records",
+      "approvers": "Discipline inspector and site lead",
+      "source": "3-12 to 3-21; 5-12 to 5-17",
+      "tasks": [
+        {
+          "id": "S06.01",
+          "title": "Install infrastructure in dependency order",
+          "action": "Release supports and pathways before cabling; verify specialist works and concealed-work inspections before covering."
+        },
+        {
+          "id": "S06.02",
+          "title": "Rack and stack",
+          "action": "Check approved elevation, rails, fixings, loading and lifting method against manufacturer instructions; preserve airflow and access."
+        },
+        {
+          "id": "S06.03",
+          "title": "Install and identify cable plant",
+          "action": "Install approved routes, protection and terminations; record cable IDs, strand mapping, both ends and measured lengths."
+        },
+        {
+          "id": "S06.04",
+          "title": "Connect only authorised services",
+          "action": "Verify exact endpoints and applicable change authority before patching or energisation; electrical work remains with authorised specialists."
+        },
+        {
+          "id": "S06.05",
+          "title": "Inspect and update as-built records",
+          "action": "Record actual positions, routes, power feeds and deviations as work progresses; do not defer reconstruction to closeout."
+        },
+        {
+          "id": "S06.06",
+          "title": "Record defects and daily progress",
+          "action": "Log quantities, labour, delays, safety/security issues and next work; correct through approved methods and re-inspect."
+        }
+      ]
+    },
+    {
+      "id": "S07",
+      "title": "Verify components and subsystems",
+      "owner": "Commissioning lead; specialist testers",
+      "depends_on": [
+        "S06"
+      ],
+      "outputs": "Pre-functional records; component and link tests; defect retests",
+      "approvers": "Commissioning lead and discipline authorities",
+      "source": "3-22 to 3-33; 5-14 to 5-16",
+      "tasks": [
+        {
+          "id": "S07.01",
+          "title": "Confirm test readiness",
+          "action": "Check approved script revision, isolated boundaries, witnesses, calibration and instrument suitability."
+        },
+        {
+          "id": "S07.02",
+          "title": "Inspect before functional testing",
+          "action": "Verify installation condition, identification, configuration baseline, cleanliness and required specialist certificates."
+        },
+        {
+          "id": "S07.03",
+          "title": "Test cabling to agreed specification",
+          "action": "Record link identity, method, wavelengths where applicable, reference setup, measured values, limits and raw evidence; link-up alone is insufficient."
+        },
+        {
+          "id": "S07.04",
+          "title": "Test each subsystem",
+          "action": "Execute approved power, cooling, monitoring, network and security tests by authorised teams; record expected and actual response."
+        },
+        {
+          "id": "S07.05",
+          "title": "Resolve failures and retest",
+          "action": "Create defect, preserve failed results, correct through change control and record new test attempt with affected regression scope."
+        },
+        {
+          "id": "S07.06",
+          "title": "Complete agreed observation period",
+          "action": "Use project-approved duration and load profile; reset or extend affected observation after material changes as agreed."
+        }
+      ]
+    },
+    {
+      "id": "S08",
+      "title": "Prove integrated and operational readiness",
+      "owner": "Commissioning lead; operations; service owners",
+      "depends_on": [
+        "S07"
+      ],
+      "outputs": "Integrated tests; recovery evidence; training and readiness records",
+      "approvers": "Owner; operations; security; commissioning authority",
+      "source": "3-24 to 3-34; 2-26 to 2-33",
+      "tasks": [
+        {
+          "id": "S08.01",
+          "title": "Approve integrated test scenarios",
+          "action": "Map each scenario to requirements, predicted impact, recovery method, witnesses and explicit stop criteria."
+        },
+        {
+          "id": "S08.02",
+          "title": "Verify resilience end to end",
+          "action": "Run only authorised scenarios demonstrating service response across power, cooling, network, controls and monitoring dependencies."
+        },
+        {
+          "id": "S08.03",
+          "title": "Verify security and emergency interfaces",
+          "action": "Authorised specialists test access/alarm and life-safety interactions against approved cause-and-effect criteria."
+        },
+        {
+          "id": "S08.04",
+          "title": "Demonstrate recovery and restoration",
+          "action": "Verify backups/configurations, recovery roles, restoration and approved RTO/RPO evidence where in scope."
+        },
+        {
+          "id": "S08.05",
+          "title": "Train operations and exercise procedures",
+          "action": "Record attendance and demonstrated competence in normal, maintenance and emergency procedures."
+        },
+        {
+          "id": "S08.06",
+          "title": "Review readiness and residual defects",
+          "action": "Unresolved critical defects block service release; any permitted minor deferral needs named owner, deadline and client acceptance."
+        }
+      ]
+    },
+    {
+      "id": "S09",
+      "title": "Cut over and accept service",
+      "owner": "Change authority; operations; service owners",
+      "depends_on": [
+        "S08"
+      ],
+      "outputs": "Cutover record; service acceptance; monitoring and rollback evidence",
+      "approvers": "Change authority and service owner",
+      "source": "3-35 to 3-36; TACHOS cutover control extension",
+      "tasks": [
+        {
+          "id": "S09.01",
+          "title": "Reconfirm go or no-go",
+          "action": "Verify current readiness, backup/recovery evidence, support staff, window, communications and rollback deadline."
+        },
+        {
+          "id": "S09.02",
+          "title": "Execute approved migration steps",
+          "action": "Record actual times and observations for each step; stop on unexpected conditions or loss of control."
+        },
+        {
+          "id": "S09.03",
+          "title": "Validate user-facing services",
+          "action": "Check application/service criteria with owners, alongside facilities/network health; infrastructure up is not service acceptance."
+        },
+        {
+          "id": "S09.04",
+          "title": "Rollback or stabilise",
+          "action": "Apply the approved recovery decision if criteria fail or the latest rollback time is reached; verify restored service."
+        },
+        {
+          "id": "S09.05",
+          "title": "Obtain operational acceptance",
+          "action": "Record service owner decision, accepted configuration, custody transfer and initial support arrangements."
+        }
+      ]
+    },
+    {
+      "id": "S10",
+      "title": "Handover and close",
+      "owner": "PM; operations; commercial lead",
+      "depends_on": [
+        "S09"
+      ],
+      "outputs": "Accepted handover pack; closeout record; obligations tracker",
+      "approvers": "Owner and operations; commercial authority",
+      "source": "3-35 to 3-36; 5-16 to 5-19",
+      "tasks": [
+        {
+          "id": "S10.01",
+          "title": "Reconcile deliverables",
+          "action": "Reconcile requirements to accepted evidence, inventory to physical assets and cable schedules to test records."
+        },
+        {
+          "id": "S10.02",
+          "title": "Deliver controlled documentation",
+          "action": "Provide approved as-builts, rack elevations, power maps, patching matrix, test reports, O&M, warranties and licences."
+        },
+        {
+          "id": "S10.03",
+          "title": "Close or transfer outstanding items",
+          "action": "Obtain approval for residual minor items with owner/due date; keep warranty and future test obligations visible."
+        },
+        {
+          "id": "S10.04",
+          "title": "Transfer access and custody",
+          "action": "Hand over spares, keys and authorised credentials through approved channels; remove temporary accounts and permissions."
+        },
+        {
+          "id": "S10.05",
+          "title": "Complete commercial closeout",
+          "action": "Reconcile variations, invoices, retention and contract-specific completion criteria; completion does not erase surviving obligations."
+        },
+        {
+          "id": "S10.06",
+          "title": "Capture lessons and archive",
+          "action": "Agree document custodian, retention and operational change process; record lessons and planned follow-up tests."
+        }
+      ]
+    }
+  ]
+}
