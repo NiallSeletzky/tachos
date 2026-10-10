@@ -26,3 +26,34 @@ footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; 
 footer p { margin:0; }
 footer>p { letter-spacing:.08em; color:#142923; }
 @media(max-width:600px) { header{min-height:90px;padding:14px 7vw}.brand{width:200px}.hero{min-height:690px}.copy{padding-top:58px}.shade{background:linear-gradient(90deg,#0b1816e8,#0b181665)}.eyebrow{margin-bottom:34px}.hero-bottom{align-items:flex-start;flex-direction:column;gap:16px}.hero-bottom p{letter-spacing:.03em}h1{font-size:clamp(42px,9vw,58px)} }
+
+/* TACHOS project delivery capabilities (public staging) */
+.project-services{background:#0d0e13;color:#eee8d7;padding:clamp(48px,6vw,92px) 7vw;}
+.project-services-heading{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:2rem;align-items:end;margin-bottom:2rem}
+.project-services-eyebrow{font-size:.76rem!important;letter-spacing:.18em;text-transform:uppercase;color:#b7c83a;margin:0 0 1.1rem!important}
+.project-services-heading h2{font-size:clamp(2rem,3.6vw,3.5rem);line-height:1.09;letter-spacing:-.035em;font-weight:500;margin:0;max-width:760px}
+.project-services-heading>p{line-height:1.65;color:#bcc7d4;max-width:460px}
+.project-services-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
+.project-services-steps>div{background:#17191f;border:1px solid #3b424c;border-top:3px solid #397dff;padding:1.35rem;min-height:170px}
+.project-services-steps>div:nth-child(2){border-top-color:#b7c83a}
+.project-services-steps>div:nth-child(3){border-top-color:#73bceb}
+.project-services-steps>div:nth-child(4){border-top-color:#d9b83f}
+.project-services-steps span{display:block;font:700 .76rem Consolas,monospace;color:#a6b8cb;margin-bottom:1.4rem}
+.project-services-steps strong{display:block;font-size:1.15rem;font-weight:600;line-height:1.3}
+.project-services-steps p{font-size:.8rem;color:#c1c8d0;line-height:1.5}
+.project-services-link{display:inline-flex;margin-top:2.25rem;padding:.9rem 1.2rem;background:#397dff;color:#fff;font-size:.95rem;gap:1.1rem;text-decoration:none;border-radius:6px;font-weight:600}
+.project-services-link:hover{background:#2a6dee}
+@media(max-width:900px){.project-services-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.project-services-heading{grid-template-columns:1fr}.project-services-steps{grid-template-columns:1fr}.project-services-steps>div{min-height:135px}.project-services{padding:48px 7vw}}
+@media(prefers-reduced-motion:reduce){.project-services *{scroll-behavior:auto!important}}
+
+/* TACHOS technical forum — matching the project-delivery section */
+.forum-services{background:#17191f;color:#eee8d7;padding:clamp(48px,6vw,92px) 7vw;border-top:1px solid #353b45}
+.forum-services-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.forum-services-topics article{background:#22262d;border:1px solid #454c55;border-left:3px solid #b7c83a;padding:1.4rem;min-height:160px}
+.forum-services-topics article:nth-child(2){border-left-color:#397dff}
+.forum-services-topics span{display:block;font:700 .75rem Consolas,monospace;color:#c1ccda;letter-spacing:.04em}
+.forum-services-topics h3{font-size:1.2rem;font-weight:600;margin:1.25rem 0 .5rem}
+.forum-services-topics p{font-size:.9rem;color:#c2c9d1;line-height:1.55;margin:0}
+.forum-services .project-services-link{margin-top:2rem}
+@media(max-width:640px){.forum-services{padding:48px 7vw}.forum-services-topics{grid-template-columns:1fr}}
