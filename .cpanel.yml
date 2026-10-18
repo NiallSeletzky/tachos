@@ -11,6 +11,7 @@ deployment:
     - /bin/cp -f sequence.js "$DEPLOYPATH"
     - /bin/cp -f tachos-forum-home.css "$DEPLOYPATH"
     - /bin/cp -f tachos-forum-home.js "$DEPLOYPATH"
+    - /bin/cp -f headline-rotation.js "$DEPLOYPATH"
     - /bin/cp -f project-delivery.html "$DEPLOYPATH"
     - /bin/cp -f rack-stack.html "$DEPLOYPATH"
     - /bin/cp -f cabling.html "$DEPLOYPATH"
