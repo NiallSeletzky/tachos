@@ -1,0 +1,20 @@
+---
+# Deploy only the public TACHOS frontend. Never copy phpBB application, secrets or database dumps.
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/tachosco/public_html/
+    - /bin/test -d "$DEPLOYPATH"
+    - /bin/mkdir -p "$DEPLOYPATH/assets"
+    - /bin/cp -f index.html "$DEPLOYPATH"
+    - /bin/cp -f styles.css "$DEPLOYPATH"
+    - /bin/cp -f app.js "$DEPLOYPATH"
+    - /bin/cp -f sequence.js "$DEPLOYPATH"
+    - /bin/cp -f tachos-forum-home.css "$DEPLOYPATH"
+    - /bin/cp -f tachos-forum-home.js "$DEPLOYPATH"
+    - /bin/cp -f project-delivery.html "$DEPLOYPATH"
+    - /bin/cp -f rack-stack.html "$DEPLOYPATH"
+    - /bin/cp -f cabling.html "$DEPLOYPATH"
+    - /bin/cp -f network.html "$DEPLOYPATH"
+    - /bin/cp -f documentation.html "$DEPLOYPATH"
+    - /bin/cp -f control-room-prototype.html "$DEPLOYPATH"
+    - /bin/cp -f assets/five-works.webp "$DEPLOYPATH/assets/"
