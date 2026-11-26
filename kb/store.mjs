@@ -577,6 +577,71 @@ function mapInquiryRow(row) {
   };
 }
 
+function mapDocumentRow(row) {
+  if (!row) return null;
+  const workArea = row.work_area || 'documentation';
+  return {
+    id: Number(row.id),
+    externalId: row.external_id,
+    source: row.source,
+    folderName: row.folder_name || '',
+    title: row.title,
+    mimeType: row.mime_type || '',
+    workArea,
+    workAreaLabel: getWorkAreaLabel(workArea),
+    sourceUrl: row.source_url || '',
+    modifiedTime: row.modified_time || '',
+    contentHash: row.content_hash || '',
+    rawExcerpt: row.raw_excerpt || '',
+    chunkCount: Number(row.chunk_count ?? 0),
+    metadata: safeJsonParse(row.metadata_json, {}),
+    indexedAt: row.indexed_at
+  };
+}
+
+function buildSafeFtsQuery(query) {
+  const rawTokens = tokenizeQuery(query);
+  const terms = [];
+  const seen = new Set();
+  for (const raw of rawTokens) {
+    const subTokens = raw.split(/[^a-z0-9]+/i).filter((t) => t.length >= 2);
+    for (const sub of subTokens) {
+      const lower = sub.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        terms.push(`"${lower}"`);
+      }
+      if (terms.length >= 16) break;
+    }
+    if (terms.length >= 16) break;
+  }
+  return terms.join(' OR ');
+}
+
+function buildChunkSnippet(content, tokens = [], maxLen = 280) {
+  const collapsed = String(content || '').replace(/\s+/g, ' ').trim();
+  if (!collapsed) return '';
+  if (collapsed.length <= maxLen) return collapsed;
+
+  const lower = collapsed.toLowerCase();
+  let bestIdx = -1;
+  for (const token of tokens) {
+    const idx = lower.indexOf(token);
+    if (idx !== -1 && (bestIdx === -1 || idx < bestIdx)) {
+      bestIdx = idx;
+    }
+  }
+
+  if (bestIdx <= 40) {
+    return `${collapsed.slice(0, maxLen - 1).trimEnd()}…`;
+  }
+  const start = Math.max(0, bestIdx - 60);
+  const end = Math.min(collapsed.length, start + maxLen - 2);
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < collapsed.length ? '…' : '';
+  return `${prefix}${collapsed.slice(start, end).trim()}${suffix}`;
+}
+
 export class TachosKbStore {
   constructor(options = {}) {
     const defaultPath = path.join(__dirname, 'data', 'tachos-kb.db');
@@ -686,7 +751,63 @@ export class TachosKbStore {
         ran_at TEXT NOT NULL,
         summary_json TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS kb_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        external_id TEXT UNIQUE NOT NULL,
+        source TEXT NOT NULL,
+        folder_name TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL,
+        mime_type TEXT NOT NULL DEFAULT '',
+        work_area TEXT NOT NULL DEFAULT 'documentation',
+        source_url TEXT NOT NULL DEFAULT '',
+        modified_time TEXT NOT NULL DEFAULT '',
+        content_hash TEXT NOT NULL DEFAULT '',
+        raw_excerpt TEXT NOT NULL DEFAULT '',
+        chunk_count INTEGER NOT NULL DEFAULT 0,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        indexed_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_kb_documents_work_area ON kb_documents(work_area);
+      CREATE INDEX IF NOT EXISTS idx_kb_documents_source ON kb_documents(source);
+
+      CREATE TABLE IF NOT EXISTS kb_chunks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        heading TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL,
+        char_count INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(document_id, chunk_index)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_kb_chunks_document ON kb_chunks(document_id);
+
+      CREATE TABLE IF NOT EXISTS web_research_cache (
+        cache_key TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_web_research_cache_expires ON web_research_cache(expires_at);
     `);
+
+    try {
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS kb_chunks_fts USING fts5(
+          title,
+          folder_name,
+          heading,
+          content,
+          tokenize='porter unicode61'
+        );
+      `);
+      this.ftsEnabled = true;
+    } catch {
+      this.ftsEnabled = false;
+    }
   }
 
   _seedDefaultArticles() {
@@ -737,13 +858,17 @@ export class TachosKbStore {
     const forumTopics = this.db.prepare('SELECT COUNT(*) AS count FROM forum_topics').get();
     const forumPosts = this.db.prepare('SELECT COUNT(*) AS count FROM forum_posts').get();
     const inquiries = this.db.prepare('SELECT COUNT(*) AS count FROM inquiries').get();
+    const documents = this.db.prepare('SELECT COUNT(*) AS count FROM kb_documents').get();
+    const documentChunks = this.db.prepare('SELECT COUNT(*) AS count FROM kb_chunks').get();
     return {
       articles: Number(articleCounts?.total ?? 0),
       verifiedArticles: Number(articleCounts?.verified ?? 0),
       aiDraftedArticles: Number(articleCounts?.drafted ?? 0),
       forumTopics: Number(forumTopics?.count ?? 0),
       forumPosts: Number(forumPosts?.count ?? 0),
-      inquiries: Number(inquiries?.count ?? 0)
+      inquiries: Number(inquiries?.count ?? 0),
+      documents: Number(documents?.count ?? 0),
+      documentChunks: Number(documentChunks?.count ?? 0)
     };
   }
 
@@ -1062,7 +1187,420 @@ export class TachosKbStore {
       .map((item) => item.post);
   }
 
-  searchKnowledge({ question, workArea, articleLimit = 4, postLimit = 3 } = {}) {
+  upsertDocument({
+    externalId,
+    source = 'gdrive',
+    folderName = '',
+    title,
+    mimeType = '',
+    workArea = 'documentation',
+    sourceUrl = '',
+    modifiedTime = '',
+    contentHash = '',
+    rawExcerpt = '',
+    chunks = [],
+    metadata = {}
+  } = {}) {
+    const extId = typeof externalId === 'string' ? externalId.trim() : '';
+    const cleanTitle = typeof title === 'string' ? title.trim() : '';
+    if (!extId || !cleanTitle) {
+      const err = new Error('Fields "externalId" and "title" are required for upsertDocument.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const cleanSource = typeof source === 'string' && source.trim() ? source.trim() : 'gdrive';
+    const cleanFolder = typeof folderName === 'string' ? folderName.trim() : '';
+    const cleanWorkArea = WORK_AREA_MAP.has(workArea) ? workArea : 'documentation';
+    const cleanMime = typeof mimeType === 'string' ? mimeType.trim() : '';
+    const cleanSourceUrl = typeof sourceUrl === 'string' ? sourceUrl.trim() : '';
+    const cleanModified = typeof modifiedTime === 'string' ? modifiedTime.trim() : '';
+    const cleanHash = typeof contentHash === 'string' ? contentHash.trim() : '';
+    const now = new Date().toISOString();
+
+    const normalizedChunks = (Array.isArray(chunks) ? chunks : [])
+      .map((chunk, idx) => {
+        const content = typeof chunk?.content === 'string' ? chunk.content.trim() : '';
+        if (!content) return null;
+        return {
+          chunkIndex: Number.isInteger(Number(chunk.chunkIndex)) ? Number(chunk.chunkIndex) : idx,
+          heading: typeof chunk.heading === 'string' ? chunk.heading.trim() : '',
+          content,
+          charCount: Number.isInteger(Number(chunk.charCount)) && Number(chunk.charCount) > 0
+            ? Number(chunk.charCount)
+            : content.length
+        };
+      })
+      .filter(Boolean);
+
+    const derivedExcerpt = typeof rawExcerpt === 'string' && rawExcerpt.trim()
+      ? rawExcerpt.trim().slice(0, 500)
+      : (normalizedChunks[0]?.content || '').replace(/\s+/g, ' ').trim().slice(0, 320);
+
+    const metaJson = JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {});
+
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const existing = this.db.prepare('SELECT id FROM kb_documents WHERE external_id = ?').get(extId);
+      let documentId;
+
+      if (existing) {
+        documentId = Number(existing.id);
+        const oldChunkRows = this.db.prepare('SELECT id FROM kb_chunks WHERE document_id = ?').all(documentId);
+        if (this.ftsEnabled && oldChunkRows.length > 0) {
+          const delFts = this.db.prepare('DELETE FROM kb_chunks_fts WHERE rowid = ?');
+          for (const row of oldChunkRows) {
+            delFts.run(Number(row.id));
+          }
+        }
+        this.db.prepare('DELETE FROM kb_chunks WHERE document_id = ?').run(documentId);
+
+        this.db.prepare(`
+          UPDATE kb_documents
+          SET source = ?, folder_name = ?, title = ?, mime_type = ?, work_area = ?,
+              source_url = ?, modified_time = ?, content_hash = ?, raw_excerpt = ?,
+              chunk_count = ?, metadata_json = ?, indexed_at = ?
+          WHERE id = ?
+        `).run(
+          cleanSource,
+          cleanFolder,
+          cleanTitle,
+          cleanMime,
+          cleanWorkArea,
+          cleanSourceUrl,
+          cleanModified,
+          cleanHash,
+          derivedExcerpt,
+          normalizedChunks.length,
+          metaJson,
+          now,
+          documentId
+        );
+      } else {
+        const res = this.db.prepare(`
+          INSERT INTO kb_documents (
+            external_id, source, folder_name, title, mime_type, work_area,
+            source_url, modified_time, content_hash, raw_excerpt,
+            chunk_count, metadata_json, indexed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          extId,
+          cleanSource,
+          cleanFolder,
+          cleanTitle,
+          cleanMime,
+          cleanWorkArea,
+          cleanSourceUrl,
+          cleanModified,
+          cleanHash,
+          derivedExcerpt,
+          normalizedChunks.length,
+          metaJson,
+          now
+        );
+        documentId = Number(res.lastInsertRowid);
+      }
+
+      if (normalizedChunks.length > 0) {
+        const insertChunk = this.db.prepare(`
+          INSERT INTO kb_chunks (document_id, chunk_index, heading, content, char_count)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        const insertFts = this.ftsEnabled
+          ? this.db.prepare(`
+              INSERT INTO kb_chunks_fts (rowid, title, folder_name, heading, content)
+              VALUES (?, ?, ?, ?, ?)
+            `)
+          : null;
+
+        for (let i = 0; i < normalizedChunks.length; i += 1) {
+          const chunk = normalizedChunks[i];
+          const chunkRes = insertChunk.run(
+            documentId,
+            i,
+            chunk.heading,
+            chunk.content,
+            chunk.charCount
+          );
+          if (insertFts) {
+            insertFts.run(
+              Number(chunkRes.lastInsertRowid),
+              cleanTitle,
+              cleanFolder,
+              chunk.heading,
+              chunk.content
+            );
+          }
+        }
+      }
+
+      this.db.exec('COMMIT');
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        // Ignore rollback errors.
+      }
+      throw err;
+    }
+
+    return this.getDocumentByExternalId(extId);
+  }
+
+  getDocumentByExternalId(externalId) {
+    if (!externalId || typeof externalId !== 'string') return null;
+    const row = this.db.prepare('SELECT * FROM kb_documents WHERE external_id = ?').get(externalId.trim());
+    return mapDocumentRow(row);
+  }
+
+  listDocuments({ workArea, source, folderName, q, limit = 100 } = {}) {
+    const clauses = [];
+    const params = [];
+    if (workArea) {
+      clauses.push('work_area = ?');
+      params.push(String(workArea));
+    }
+    if (source) {
+      clauses.push('source = ?');
+      params.push(String(source));
+    }
+    if (folderName) {
+      clauses.push('folder_name = ?');
+      params.push(String(folderName));
+    }
+
+    const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const rows = this.db
+      .prepare(`SELECT * FROM kb_documents ${whereSql} ORDER BY indexed_at DESC, id DESC`)
+      .all(...params);
+
+    let docs = rows.map(mapDocumentRow);
+    const trimmedQ = typeof q === 'string' ? q.trim() : '';
+    if (trimmedQ) {
+      const tokens = tokenizeQuery(trimmedQ);
+      const queryLower = trimmedQ.toLowerCase();
+      docs = docs
+        .map((doc) => {
+          const score = scoreTextMatch(tokens, queryLower, [
+            { text: doc.title, weight: 8 },
+            { text: doc.folderName, weight: 4 },
+            { text: doc.rawExcerpt, weight: 3 },
+            { text: doc.workAreaLabel, weight: 2 },
+            { text: doc.source, weight: 1 }
+          ]);
+          return { doc, score };
+        })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.doc);
+    }
+
+    const parsedLimit = Math.max(1, Math.min(Number(limit) || 100, 500));
+    return docs.slice(0, parsedLimit);
+  }
+
+  deleteDocument(idOrExternalId) {
+    if (idOrExternalId === null || idOrExternalId === undefined || idOrExternalId === '') return false;
+    const raw = String(idOrExternalId).trim();
+    let row = this.db.prepare('SELECT id FROM kb_documents WHERE external_id = ?').get(raw);
+    if (!row && /^\d+$/.test(raw)) {
+      row = this.db.prepare('SELECT id FROM kb_documents WHERE id = ?').get(Number(raw));
+    }
+    if (!row) return false;
+
+    const docId = Number(row.id);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const chunkRows = this.db.prepare('SELECT id FROM kb_chunks WHERE document_id = ?').all(docId);
+      if (this.ftsEnabled && chunkRows.length > 0) {
+        const delFts = this.db.prepare('DELETE FROM kb_chunks_fts WHERE rowid = ?');
+        for (const chunk of chunkRows) {
+          delFts.run(Number(chunk.id));
+        }
+      }
+      this.db.prepare('DELETE FROM kb_chunks WHERE document_id = ?').run(docId);
+      this.db.prepare('DELETE FROM kb_documents WHERE id = ?').run(docId);
+      this.db.exec('COMMIT');
+      return true;
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        // Ignore rollback errors.
+      }
+      throw err;
+    }
+  }
+
+  searchDocumentChunks(query, { workArea = '', limit = 6 } = {}) {
+    const trimmed = typeof query === 'string' ? query.trim() : '';
+    const parsedLimit = Math.max(1, Math.min(Number(limit) || 6, 30));
+    if (!trimmed) return [];
+
+    const tokens = tokenizeQuery(trimmed);
+    const queryLower = trimmed.toLowerCase();
+    const cleanWorkArea = typeof workArea === 'string' ? workArea.trim() : '';
+
+    const deduplicateByDoc = (ranked) => {
+      const docCounts = new Map();
+      const results = [];
+      for (const item of ranked) {
+        const current = docCounts.get(item.documentId) ?? 0;
+        if (current >= 2) continue;
+        docCounts.set(item.documentId, current + 1);
+        results.push(item);
+        if (results.length >= parsedLimit) break;
+      }
+      return results;
+    };
+
+    if (this.ftsEnabled) {
+      const ftsQuery = buildSafeFtsQuery(trimmed);
+      if (ftsQuery) {
+        try {
+          const rows = this.db.prepare(`
+            SELECT
+              c.id AS chunk_id,
+              c.document_id AS document_id,
+              c.heading AS heading,
+              c.content AS content,
+              d.external_id AS external_id,
+              d.title AS title,
+              d.folder_name AS folder_name,
+              d.work_area AS work_area,
+              d.source AS source,
+              d.source_url AS source_url,
+              bm25(kb_chunks_fts, 6.0, 2.0, 4.0, 1.0) AS bm25_rank
+            FROM kb_chunks_fts
+            JOIN kb_chunks c ON c.id = kb_chunks_fts.rowid
+            JOIN kb_documents d ON d.id = c.document_id
+            WHERE kb_chunks_fts MATCH ?
+            ORDER BY bm25_rank ASC
+            LIMIT ?
+          `).all(ftsQuery, Math.max(parsedLimit * 6, 24));
+
+          if (rows.length > 0) {
+            const scored = rows
+              .map((row) => {
+                const rawRank = Number(row.bm25_rank);
+                let score = Number.isFinite(rawRank) ? Math.max(0.5, -rawRank * 2 + 2) : 1;
+                if (cleanWorkArea && row.work_area === cleanWorkArea) {
+                  score += 4;
+                }
+                return {
+                  chunkId: Number(row.chunk_id),
+                  documentId: Number(row.document_id),
+                  externalId: row.external_id,
+                  title: row.title,
+                  folderName: row.folder_name || '',
+                  workArea: row.work_area || 'documentation',
+                  source: row.source,
+                  sourceUrl: row.source_url || '',
+                  heading: row.heading || '',
+                  content: row.content,
+                  snippet: buildChunkSnippet(row.content, tokens),
+                  score: Number(score.toFixed(3))
+                };
+              })
+              .sort((a, b) => b.score - a.score);
+
+            return deduplicateByDoc(scored);
+          }
+        } catch {
+          // Fall through cleanly to JS token matching if FTS5 fails.
+        }
+      }
+    }
+
+    const rows = this.db.prepare(`
+      SELECT
+        c.id AS chunk_id,
+        c.document_id AS document_id,
+        c.heading AS heading,
+        c.content AS content,
+        d.external_id AS external_id,
+        d.title AS title,
+        d.folder_name AS folder_name,
+        d.work_area AS work_area,
+        d.source AS source,
+        d.source_url AS source_url
+      FROM kb_chunks c
+      JOIN kb_documents d ON d.id = c.document_id
+      ORDER BY d.indexed_at DESC, c.id ASC
+      LIMIT 1500
+    `).all();
+
+    const scored = rows
+      .map((row) => {
+        let score = scoreTextMatch(tokens, queryLower, [
+          { text: row.title, weight: 6 },
+          { text: row.folder_name, weight: 2 },
+          { text: row.heading, weight: 4 },
+          { text: row.content, weight: 2 }
+        ]);
+        if (score > 0 && cleanWorkArea && row.work_area === cleanWorkArea) {
+          score += 4;
+        }
+        return {
+          chunkId: Number(row.chunk_id),
+          documentId: Number(row.document_id),
+          externalId: row.external_id,
+          title: row.title,
+          folderName: row.folder_name || '',
+          workArea: row.work_area || 'documentation',
+          source: row.source,
+          sourceUrl: row.source_url || '',
+          heading: row.heading || '',
+          content: row.content,
+          snippet: buildChunkSnippet(row.content, tokens),
+          score
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    return deduplicateByDoc(scored);
+  }
+
+  getCachedWebResearch(cacheKey) {
+    if (!cacheKey || typeof cacheKey !== 'string') return null;
+    const key = cacheKey.trim();
+    if (!key) return null;
+    const now = Date.now();
+    const row = this.db
+      .prepare('SELECT payload_json, expires_at FROM web_research_cache WHERE cache_key = ?')
+      .get(key);
+    if (!row) return null;
+    if (Number(row.expires_at) <= now) {
+      this.db.prepare('DELETE FROM web_research_cache WHERE cache_key = ?').run(key);
+      return null;
+    }
+    return safeJsonParse(row.payload_json, null);
+  }
+
+  setCachedWebResearch(cacheKey, payload, ttlSeconds = 900) {
+    if (!cacheKey || typeof cacheKey !== 'string') return null;
+    const key = cacheKey.trim();
+    if (!key) return null;
+    const now = Date.now();
+    const ttlMs = Math.max(10, Number(ttlSeconds) || 900) * 1000;
+    const expiresAt = now + ttlMs;
+    const createdAt = new Date(now).toISOString();
+
+    this.db.prepare(`
+      INSERT INTO web_research_cache (cache_key, payload_json, expires_at, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(cache_key) DO UPDATE SET
+        payload_json = excluded.payload_json,
+        expires_at = excluded.expires_at,
+        created_at = excluded.created_at
+    `).run(key, JSON.stringify(payload ?? {}), expiresAt, createdAt);
+
+    this.db.prepare('DELETE FROM web_research_cache WHERE expires_at <= ?').run(now);
+    return payload;
+  }
+
+  searchKnowledge({ question, workArea, articleLimit = 4, documentLimit = 5, postLimit = 3 } = {}) {
     const tokens = tokenizeQuery(question);
     const queryLower = (question || '').trim().toLowerCase();
 
@@ -1091,8 +1629,9 @@ export class TachosKbStore {
       .slice(0, articleLimit)
       .map((item) => item.article);
 
+    const documents = this.searchDocumentChunks(question, { workArea, limit: documentLimit });
     const forumPosts = this.searchForumPosts(question, { limit: postLimit });
-    return { articles: rankedArticles, forumPosts };
+    return { articles: rankedArticles, documents, forumPosts };
   }
 
   createInquiry({ name, company = '', email, workAreas = [], region = '', scope, clientIp = '' }) {
