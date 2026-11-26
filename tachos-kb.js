@@ -328,6 +328,7 @@
      ========================================================================= */
   const state = {
     kbOnline: false,
+    kbStats: null,
     articles: SEEDED_ARTICLES.slice(),
     articleFilter: {
       workArea: '',
@@ -685,6 +686,39 @@
     }
   }
 
+  function updateKbSourceMode() {
+    if (!kbSourceMode) return;
+    if (!state.kbOnline) {
+      kbSourceMode.textContent = 'Five Works Reference Mode (static fallback)';
+      return;
+    }
+    const guideCount =
+      state.kbStats && typeof state.kbStats.articles === 'number'
+        ? state.kbStats.articles
+        : state.articles.length;
+    const guideLabel = guideCount === 1 ? '1 guide' : `${guideCount} guides`;
+    if (state.kbStats && typeof state.kbStats.documents === 'number') {
+      const docCount = state.kbStats.documents;
+      const docLabel = docCount === 1 ? '1 technical doc indexed' : `${docCount} technical docs indexed`;
+      kbSourceMode.textContent = `Live Knowledge Base · ${guideLabel} · ${docLabel}`;
+    } else {
+      kbSourceMode.textContent = `Live Knowledge Base · ${guideLabel} connected`;
+    }
+  }
+
+  async function loadKbStatus() {
+    try {
+      const data = await fetchJson(`${API_BASE}/status`, {}, 6000);
+      if (data && data.stats && typeof data.stats === 'object') {
+        state.kbOnline = true;
+        state.kbStats = data.stats;
+        updateKbSourceMode();
+      }
+    } catch (_) {
+      /* Graceful fallback when /kb/status is unavailable */
+    }
+  }
+
   async function loadArticles() {
     const params = new URLSearchParams();
     if (state.articleFilter.workArea) params.set('workArea', state.articleFilter.workArea);
@@ -698,9 +732,7 @@
       if (data && Array.isArray(data.articles)) {
         state.kbOnline = true;
         state.articles = data.articles;
-        if (kbSourceMode) {
-          kbSourceMode.textContent = 'Live Knowledge Base connected';
-        }
+        updateKbSourceMode();
         renderArticles(data.articles);
         return;
       }
@@ -710,9 +742,7 @@
 
     state.kbOnline = false;
     state.articles = SEEDED_ARTICLES.slice();
-    if (kbSourceMode) {
-      kbSourceMode.textContent = 'Five Works Reference Mode (static fallback)';
-    }
+    updateKbSourceMode();
     renderArticles(filterArticlesLocally(SEEDED_ARTICLES));
   }
 
@@ -761,6 +791,7 @@
   const askForm = document.getElementById('kb-ask-form');
   const askInput = document.getElementById('kb-ask-input');
   const askWorkArea = document.getElementById('kb-ask-work-area');
+  const askWebResearchToggle = document.getElementById('kb-ask-web-research');
   const askSubmitBtn = document.getElementById('kb-ask-submit');
   const askResultBox = document.getElementById('kb-ask-result');
   const promptChips = Array.from(document.querySelectorAll('[data-kb-prompt]'));
@@ -832,15 +863,91 @@
     };
   }
 
+  function createCitationBadge(cite) {
+    const type = String(cite.type || '').toLowerCase();
+    if (type === 'drive_document' || type === 'technical_document' || type === 'document') {
+      return el('span', {
+        className: 'tk-badge tk-badge--library',
+        textContent: '📄 Technical Library'
+      });
+    }
+    if (type === 'web_source' || type === 'web') {
+      return el('span', {
+        className: 'tk-badge tk-badge--web',
+        textContent: '🌐 Live Web'
+      });
+    }
+    if (type === 'forum_post' || type === 'forum_topic' || type === 'forum') {
+      return el('span', {
+        className: 'tk-badge tk-badge--forum',
+        textContent: '💬 Forum'
+      });
+    }
+    if (cite.status === 'ai_drafted') {
+      return el('span', {
+        className: 'tk-badge tk-badge--ai',
+        textContent: '✦ AI-Drafted'
+      });
+    }
+    if (cite.status === 'engineer_verified' || type === 'kb_article') {
+      return el('span', {
+        className: 'tk-badge tk-badge--verified',
+        textContent: '✓ Engineer Verified'
+      });
+    }
+    return null;
+  }
+
+  function extractHostname(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return '';
+    try {
+      return new URL(rawUrl).hostname.replace(/^www\./i, '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function formatCitationMeta(cite) {
+    const type = String(cite.type || '').toLowerCase();
+    if (type === 'drive_document' || type === 'technical_document' || type === 'document') {
+      const parts = [cite.folderName, cite.heading || cite.section].filter(Boolean);
+      return parts.join(' · ');
+    }
+    if (type === 'web_source' || type === 'web') {
+      const host = cite.domain || extractHostname(cite.url);
+      const parts = [host, cite.provider || cite.source].filter(Boolean);
+      return parts.join(' · ');
+    }
+    if (type === 'forum_post' || type === 'forum_topic' || type === 'forum') {
+      return cite.author ? `Posted by ${cite.author}` : 'Community technical discussion';
+    }
+    return '';
+  }
+
   function renderAskResponse(payload, selectedArea) {
     if (!askResultBox) return;
     askResultBox.hidden = false;
     askResultBox.replaceChildren();
 
-    const modeLabel =
-      payload.mode === 'ai' || payload.mode === 'live'
-        ? 'AI-Assisted Synthesis'
-        : payload.mode || 'Technical Assistant';
+    let modeLabel = 'Technical Assistant';
+    if (payload.researchMode === 'deep' || payload.webSearchUsed) {
+      const extraParts = [];
+      if (Number(payload.documentHits) > 0) {
+        extraParts.push(`${payload.documentHits} library`);
+      }
+      if (Number(payload.webHits) > 0) {
+        extraParts.push(`${payload.webHits} web`);
+      }
+      modeLabel = extraParts.length
+        ? `Deep Research (${extraParts.join(' + ')})`
+        : 'Deep Library + Live Web';
+    } else if (payload.mode === 'ai' || payload.mode === 'live' || payload.mode === 'llm') {
+      modeLabel = 'AI-Assisted Synthesis';
+    } else if (payload.mode === 'grounded_search') {
+      modeLabel = 'Grounded KB & Library';
+    } else if (payload.mode) {
+      modeLabel = String(payload.mode);
+    }
 
     const bodyEl = el('div', { className: 'kb-answer__body' });
     appendParagraphs(bodyEl, payload.answer || 'No answer returned.');
@@ -870,16 +977,20 @@
     if (Array.isArray(payload.citations) && payload.citations.length) {
       const grid = el('div', { className: 'kb-citations__grid' });
       for (const cite of payload.citations) {
-        const matchedArticle = state.articles.find(
-          (a) =>
-            (cite.slug && a.slug === cite.slug) ||
-            (cite.title && a.title === cite.title)
-        );
+        const citeType = String(cite.type || '').toLowerCase();
+        const isKbArticle =
+          citeType === 'kb_article' || (!citeType && (cite.slug || cite.status));
+        const matchedArticle = isKbArticle
+          ? state.articles.find(
+              (a) =>
+                (cite.slug && a.slug === cite.slug) ||
+                (cite.title && a.title === cite.title)
+            )
+          : null;
 
-        const badge =
-          cite.status === 'engineer_verified' || cite.status === 'ai_drafted'
-            ? createStatusBadge(cite.status)
-            : null;
+        const badge = createCitationBadge(cite);
+        const metaLine = formatCitationMeta(cite);
+        const excerptText = cite.excerpt || cite.snippet || '';
 
         if (matchedArticle) {
           grid.appendChild(
@@ -892,13 +1003,33 @@
               },
               badge,
               el('span', { className: 'kb-citation-card__title', textContent: cite.title || 'Technical guide' }),
-              cite.excerpt ? el('span', { className: 'kb-citation-card__excerpt', textContent: cite.excerpt }) : null
+              excerptText ? el('span', { className: 'kb-citation-card__excerpt', textContent: excerptText }) : null
+            )
+          );
+        } else if (
+          (citeType === 'forum_post' || citeType === 'forum_topic' || citeType === 'forum') &&
+          cite.topicId &&
+          state.forumOnline
+        ) {
+          grid.appendChild(
+            el(
+              'button',
+              {
+                type: 'button',
+                className: 'kb-citation-card',
+                onClick: (evt) => openForumThread(cite.topicId, evt.currentTarget, { title: cite.title, url: cite.url })
+              },
+              badge,
+              el('span', { className: 'kb-citation-card__title', textContent: cite.title || 'Forum thread' }),
+              metaLine ? el('span', { className: 'kb-citation-card__meta', textContent: metaLine }) : null,
+              excerptText ? el('span', { className: 'kb-citation-card__excerpt', textContent: excerptText }) : null
             )
           );
         } else {
-          const validHref = safeUrl(cite.url);
+          const validHref = safeUrl(cite.url || cite.sourceUrl);
+          const isWebSource = citeType === 'web_source' || citeType === 'web';
           if (validHref) {
-            const isExt = /^https?:\/\//i.test(validHref);
+            const isExt = isWebSource || /^https?:\/\//i.test(validHref);
             grid.appendChild(
               el(
                 'a',
@@ -909,9 +1040,13 @@
                   rel: isExt ? 'noopener noreferrer' : null
                 },
                 badge,
-                el('span', { className: 'kb-citation-card__title', textContent: cite.title || 'Reference source' }),
-                cite.excerpt
-                  ? el('span', { className: 'kb-citation-card__excerpt', textContent: cite.excerpt })
+                el('span', {
+                  className: 'kb-citation-card__title',
+                  textContent: isWebSource ? `${cite.title || 'External reference'} ↗` : cite.title || 'Reference source'
+                }),
+                metaLine ? el('span', { className: 'kb-citation-card__meta', textContent: metaLine }) : null,
+                excerptText
+                  ? el('span', { className: 'kb-citation-card__excerpt', textContent: excerptText })
                   : null
               )
             );
@@ -922,8 +1057,9 @@
                 { className: 'kb-citation-card' },
                 badge,
                 el('span', { className: 'kb-citation-card__title', textContent: cite.title || 'Reference source' }),
-                cite.excerpt
-                  ? el('span', { className: 'kb-citation-card__excerpt', textContent: cite.excerpt })
+                metaLine ? el('span', { className: 'kb-citation-card__meta', textContent: metaLine }) : null,
+                excerptText
+                  ? el('span', { className: 'kb-citation-card__excerpt', textContent: excerptText })
                   : null
               )
             );
@@ -941,13 +1077,19 @@
       );
     }
 
+    const ctaText =
+      typeof payload.cta === 'string'
+        ? payload.cta
+        : (payload.cta && (payload.cta.text || payload.cta.label)) ||
+          'Planning a live data-centre build, rack deployment, or cabling handover?';
+
     askResultBox.appendChild(
       el(
         'div',
         { className: 'kb-answer__cta' },
         el('p', {
           className: 'kb-answer__cta-text',
-          textContent: payload.cta || 'Planning a live data-centre build, rack deployment, or cabling handover?'
+          textContent: ctaText
         }),
         el('button', {
           type: 'button',
@@ -965,6 +1107,7 @@
 
     const question = askInput.value.trim();
     const workArea = askWorkArea ? askWorkArea.value : '';
+    const includeWebResearch = askWebResearchToggle ? Boolean(askWebResearchToggle.checked) : true;
     if (!question) {
       askInput.focus();
       return;
@@ -972,15 +1115,25 @@
 
     if (askSubmitBtn) {
       askSubmitBtn.disabled = true;
-      askSubmitBtn.textContent = 'Checking guides…';
+      askSubmitBtn.textContent = includeWebResearch ? 'Researching…' : 'Checking guides…';
     }
     askResultBox.hidden = false;
     askResultBox.replaceChildren(
       el('p', {
         className: 'kb-answer__cta-text',
-        textContent: 'Searching TACHOS verified engineering guides and technical discussions…'
+        textContent: includeWebResearch
+          ? 'Searching TACHOS guides, Technical Library, forum threads, and live authoritative web sources…'
+          : 'Searching TACHOS verified engineering guides, Technical Library, and technical discussions…'
       })
     );
+
+    const requestBody = {
+      question,
+      webSearch: includeWebResearch,
+      deepResearch: includeWebResearch,
+      mode: includeWebResearch ? 'deep' : 'standard'
+    };
+    if (workArea) requestBody.workArea = workArea;
 
     try {
       const data = await fetchJson(
@@ -988,9 +1141,9 @@
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(workArea ? { question, workArea } : { question })
+          body: JSON.stringify(requestBody)
         },
-        14000
+        includeWebResearch ? 25000 : 14000
       );
       renderAskResponse(data, workArea);
     } catch (_) {
@@ -1612,6 +1765,7 @@
   wireDrawerChrome(surveyBackdrop);
 
   syncFilterButtons();
+  loadKbStatus();
   loadArticles();
   loadForumTopics('');
 })();

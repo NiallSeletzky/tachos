@@ -10,6 +10,9 @@ import { createTachosKbServer } from '../server.mjs';
 import { createPhpbbClient, parsePhpbbBoards } from '../phpbb-bridge.mjs';
 import { classifyWorkArea, parseFeedXml } from '../agents/dc-feeds.mjs';
 import { runCurator } from '../agents/tachos-curator.mjs';
+import { isAllowedTechnicalFile, extractTextFromBuffer } from '../ingest/extractors.mjs';
+import { syncLocalFolder } from '../ingest/gdrive-sync.mjs';
+import { isSafePublicUrl, fetchReadableSnippet, researchWeb } from '../research/web-researcher.mjs';
 
 test('TACHOS KB server seeds 5 Engineer Verified + 2 AI-Drafted guides, supports Q&A citations, admin verification, and Site Survey inquiries', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tachos-kb-'));
@@ -252,7 +255,7 @@ test('TACHOS phpBB bridge enforces read-only non-AI boards, relays AI-board repl
   assert.equal(notif.status, 202);
 
   const tools = await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  assert.equal(tools.json.result.tools.length, 5);
+  assert.equal(tools.json.result.tools.length, 7);
 
   const searchCall = await rpc({
     jsonrpc: '2.0',
@@ -316,3 +319,287 @@ test('Industry feed parser and TACHOS curator draft AI-Drafted guides without ov
   assert.equal(verified.length, 5);
   store.close();
 });
+
+test('Technical Library ingestion enforces privacy denylist, indexes chunks in SQLite FTS5, and cites Drive docs in /ask and MCP', async (t) => {
+  // 1. Privacy denylist checks
+  assert.equal(isAllowedTechnicalFile({ name: 'TACHOS-October-invoice-review.md', mimeType: 'text/markdown' }).allowed, false);
+  assert.equal(isAllowedTechnicalFile({ name: 'Billing-Ledger.csv', path: 'ChatGPT/TACHOS-Billing', mimeType: 'text/csv' }).allowed, false);
+  assert.equal(isAllowedTechnicalFile({ name: 'Cisco Certified Network Associate certificate.pdf', mimeType: 'application/pdf' }).allowed, false);
+  assert.equal(isAllowedTechnicalFile({ name: '._COURSE SLIDES.pdf', mimeType: 'application/pdf' }).allowed, false);
+  assert.equal(isAllowedTechnicalFile({ name: 'BGP.docx', path: 'CISCO/BGP.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }).allowed, true);
+  assert.equal(isAllowedTechnicalFile({ name: 'Data-Center-Cabling-Standards-Guide-2026.md', mimeType: 'text/markdown' }).allowed, true);
+
+  // 2. Local drop-folder sync + incremental skip + denylist enforcement
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tachos-ingest-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const docsDir = path.join(dir, 'docs');
+  fs.mkdirSync(docsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(docsDir, 'bgp-evpn-notes.md'),
+    '# Cisco BGP EVPN VXLAN Fabric Notes\n\nConfigure eBGP underlay with BFD timers at 50ms x 3 and spine-leaf ECMP over 400G OS2 trunks.\n\n## Route Reflectors\nUse Anycast Gateway IRB with symmetric IRB VRF VNI mapping and verify neighbour state with show bgp l2vpn evpn summary.\n',
+  );
+  fs.writeFileSync(path.join(docsDir, 'client-invoice-2026.md'), 'Confidential billing invoice £12,000');
+  fs.writeFileSync(path.join(docsDir, '._hidden.md'), 'macOS AppleDouble metadata');
+
+  const store = createStore({ dbPath: path.join(dir, 'tachos-kb.db') });
+  const sync1 = await syncLocalFolder({ store, dirPath: docsDir, folderLabel: 'CISCO' });
+  assert.equal(sync1.ingested, 1);
+  assert.equal(sync1.rejected, 2);
+
+  // Second run skips unchanged file
+  const sync2 = await syncLocalFolder({ store, dirPath: docsDir, folderLabel: 'CISCO' });
+  assert.equal(sync2.skipped, 1);
+  assert.equal(sync2.ingested, 0);
+
+  // 3. HTTP Admin /api/v1/documents/ingest + /api/v1/documents + /api/v1/ask citing drive_document + MCP search_technical_documents
+  const app = createTachosKbServer({
+    store,
+    basePath: '/kb',
+    adminToken: 'tachos-ingest-secret',
+    env: { TACHOS_AUTO_WEB_SEARCH: '0' },
+  });
+  app.server.listen(0, '127.0.0.1');
+  await once(app.server, 'listening');
+  t.after(async () => {
+    await app.close();
+  });
+  const baseUrl = `http://127.0.0.1:${app.server.address().port}/kb`;
+
+  // Unauthenticated ingest rejected
+  const unauthRes = await fetch(`${baseUrl}/api/v1/documents/ingest`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ title: 'Test.md', text: 'Should fail without token' }),
+  });
+  assert.equal(unauthRes.status, 401);
+
+  // Authenticated batch ingest (1 valid technical doc + 1 rejected billing doc)
+  const ingestRes = await fetch(`${baseUrl}/api/v1/documents/ingest`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: 'Bearer tachos-ingest-secret',
+    },
+    body: JSON.stringify({
+      documents: [
+        {
+          externalId: 'gdrive:netbotz-1',
+          source: 'gdrive',
+          folderName: 'TACHOS DATA CENTER',
+          title: 'Netbotz.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          text: '# NetBotz Rack Environmental Monitoring\n\nInstall NetBotz temperature and humidity sensors at top, middle, and bottom front intake of high-density AI racks plus door contact switches and leak rope below CRAC units.\n',
+        },
+        {
+          externalId: 'gdrive:bad-invoice',
+          source: 'gdrive',
+          folderName: 'Accounting',
+          title: 'October-Invoice.md',
+          text: 'Private invoice should be rejected',
+        },
+      ],
+    }),
+  });
+  assert.equal(ingestRes.status, 201);
+  const ingestData = await ingestRes.json();
+  assert.equal(ingestData.ingested, 1);
+  assert.equal(ingestData.rejected, 1);
+
+  // Public /api/v1/documents lists both technical docs
+  const docsRes = await fetch(`${baseUrl}/api/v1/documents`);
+  assert.equal(docsRes.status, 200);
+  const docsData = await docsRes.json();
+  assert.equal(docsData.documents.length, 2);
+
+  // /api/v1/ask retrieves NetBotz from Technical Library chunks
+  const askRes = await fetch(`${baseUrl}/api/v1/ask`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      question: 'Where should NetBotz rack temperature sensors and leak rope be placed?',
+      workArea: 'rack-stack',
+      webSearch: false,
+    }),
+  });
+  assert.equal(askRes.status, 200);
+  const askData = await askRes.json();
+  assert.ok(askData.documentHits >= 1, 'Expected Technical Library document hits');
+  assert.ok(
+    askData.citations.some((c) => c.type === 'drive_document' && /Netbotz/i.test(c.title)),
+    'Expected drive_document citation for Netbotz.docx',
+  );
+
+  // MCP search_technical_documents returns BGP EVPN chunk
+  const mcpRes = await fetch(`${baseUrl}/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 10,
+      method: 'tools/call',
+      params: { name: 'search_technical_documents', arguments: { query: 'BGP EVPN VXLAN BFD' } },
+    }),
+  });
+  assert.equal(mcpRes.status, 200);
+  const mcpData = await mcpRes.json();
+  assert.equal(mcpData.result.isError, false);
+  assert.ok(mcpData.result.structuredContent.documents.length >= 1);
+  assert.match(mcpData.result.structuredContent.documents[0].title, /bgp-evpn/i);
+});
+
+test('Live web research enforces SSRF and anti-bot safety, caches results, supports multi-AI /api/v1/research and MCP deep_technical_research', async (t) => {
+  // 1. SSRF URL guard
+  assert.equal(isSafePublicUrl('http://127.0.0.1:8080/admin'), false);
+  assert.equal(isSafePublicUrl('http://169.254.169.254/latest/meta-data/'), false);
+  assert.equal(isSafePublicUrl('http://10.0.0.1/internal'), false);
+  assert.equal(isSafePublicUrl('file:///etc/passwd'), false);
+  assert.equal(isSafePublicUrl('https://datatracker.ietf.org/doc/rfc7432/'), true);
+
+  // 2. Anti-bot / challenge HTML is rejected cleanly (never bypassed)
+  const blockedSnippet = await fetchReadableSnippet('https://example.org/protected', {
+    fetchImpl: async () =>
+      new Response('<html><body>One moment, please... Imunify360 verify you are human</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      }),
+  });
+  assert.equal(blockedSnippet, null);
+
+  // 3. Mocked Tavily + Perplexity + IETF web research + SQLite cache + /api/v1/research
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tachos-research-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const store = createStore({ dbPath: path.join(dir, 'tachos-kb.db') });
+
+  let fetchCount = 0;
+  const mockFetch = async (url) => {
+    fetchCount += 1;
+    const u = String(url);
+    if (u.includes('api.tavily.com')) {
+      return new Response(
+        JSON.stringify({
+          answer: 'RFC 7432 defines BGP MPLS-Based Ethernet VPN (EVPN) for data centre fabric overlays.',
+          results: [
+            {
+              title: 'RFC 7432: BGP MPLS-Based Ethernet VPN',
+              url: 'https://datatracker.ietf.org/doc/html/rfc7432',
+              content: 'Standard EVPN control plane for MAC/IP mobility in multi-tenant data centres.',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (u.includes('api.perplexity.ai')) {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: 'EVPN-VXLAN uses BGP Type-2 and Type-5 routes with symmetric IRB for scalable leaf-spine fabrics.',
+              },
+            },
+          ],
+          citations: ['https://www.cisco.com/c/en/us/products/collateral/switches/nexus-9000-series-switches/evpn-vxlan.html'],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (u.includes('api.x.ai')) {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: 'In data centre leaf-spine fabrics, BGP EVPN-VXLAN (RFC 7432 / RFC 8365) [1] provides control-plane MAC learning and multi-homing.',
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    return new Response(JSON.stringify({ objects: [], query: { search: [] } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const env = {
+    TAVILY_API_KEY: 'tvly-test',
+    PERPLEXITY_API_KEY: 'pplx-test',
+    XAI_API_KEY: 'xai-test',
+    TACHOS_XAI_LIVE_SEARCH: '0',
+    TACHOS_MULTI_AI: '1',
+  };
+
+  const r1 = await researchWeb({
+    question: 'Explain BGP EVPN VXLAN leaf-spine fabric design',
+    workArea: 'network',
+    env,
+    fetchImpl: mockFetch,
+    store,
+  });
+  assert.equal(r1.cached, false);
+  assert.ok(r1.webSources.length >= 2);
+  assert.ok(r1.providersUsed.includes('tavily'));
+  assert.ok(r1.providersUsed.includes('perplexity'));
+
+  // Cache hit avoids redundant upstream calls
+  const countBeforeCache = fetchCount;
+  const r2 = await researchWeb({
+    question: 'Explain BGP EVPN VXLAN leaf-spine fabric design',
+    workArea: 'network',
+    env,
+    fetchImpl: mockFetch,
+    store,
+  });
+  assert.equal(r2.cached, true);
+  assert.equal(fetchCount, countBeforeCache);
+
+  // Full /api/v1/research HTTP endpoint + MCP deep_technical_research
+  const app = createTachosKbServer({
+    store,
+    basePath: '/kb',
+    env,
+    fetchImpl: mockFetch,
+  });
+  app.server.listen(0, '127.0.0.1');
+  await once(app.server, 'listening');
+  t.after(async () => {
+    await app.close();
+  });
+  const baseUrl = `http://127.0.0.1:${app.server.address().port}/kb`;
+
+  const resHttp = await fetch(`${baseUrl}/api/v1/research`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      question: 'Explain BGP EVPN VXLAN leaf-spine fabric design',
+      workArea: 'network',
+    }),
+  });
+  assert.equal(resHttp.status, 200);
+  const resData = await resHttp.json();
+  assert.ok(resData.webSources.length >= 2);
+  assert.ok(resData.citations.some((c) => c.type === 'web_source'));
+  assert.ok(resData.providersUsed.length >= 1);
+
+  const mcpDeep = await fetch(`${baseUrl}/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 11,
+      method: 'tools/call',
+      params: {
+        name: 'deep_technical_research',
+        arguments: { question: 'Explain BGP EVPN VXLAN leaf-spine fabric design', workArea: 'network' },
+      },
+    }),
+  });
+  assert.equal(mcpDeep.status, 200);
+  const mcpDeepData = await mcpDeep.json();
+  assert.equal(mcpDeepData.result.isError, false);
+  assert.ok(mcpDeepData.result.structuredContent.webSources.length >= 2);
+});
+

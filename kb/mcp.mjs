@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
 import { WORK_AREAS } from './store.mjs';
 import { answerQuestion } from './llm.mjs';
+import { researchWeb } from './research/web-researcher.mjs';
 
 export const MCP_SERVER_INFO = Object.freeze({
   name: 'tachos-technical-kb',
-  version: '1.0.0'
+  version: '1.1.0'
 });
 
 export const MCP_PROTOCOL_VERSION = '2025-03-26';
@@ -141,6 +142,68 @@ export const MCP_TOOLS = Object.freeze([
         }
       }
     }
+  },
+  {
+    name: 'search_technical_documents',
+    description:
+      'Search indexed TACHOS Technical Document Library chunks (Google Drive technical manuals, SOPs, standards notes, and engineering PDFs/DOCX/MD) by keyword and optional Five Works area.',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['query'],
+      properties: {
+        query: {
+          type: 'string',
+          minLength: 2,
+          maxLength: 400,
+          description: 'Search terms (e.g. MPO polarity, OTDR trace, PDU phase balance, BGP EVPN).'
+        },
+        workArea: {
+          type: 'string',
+          enum: WORK_AREAS.map((a) => a.id),
+          description: 'Optional Five Works filter.'
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          description: 'Maximum number of document chunks to return (default 6).'
+        }
+      }
+    }
+  },
+  {
+    name: 'deep_technical_research',
+    description:
+      'Run hybrid deep technical research across TACHOS Knowledge Base guides, indexed Technical Document Library, community forum discussions, and live authoritative web sources.',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true
+    },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['question'],
+      properties: {
+        question: {
+          type: 'string',
+          minLength: 5,
+          maxLength: 600,
+          description: 'Technical question to research deeply across KB guides, Technical Library, forum, and live web.'
+        },
+        workArea: {
+          type: 'string',
+          enum: WORK_AREAS.map((a) => a.id),
+          description: 'Optional Five Works scope focus.'
+        }
+      }
+    }
   }
 ]);
 
@@ -247,11 +310,12 @@ export function createMcpHandler({
           return toolError('Parameter "question" must be between 5 and 600 characters.');
         }
         const workArea = typeof input.workArea === 'string' ? input.workArea.trim() : '';
-        const { articles, forumPosts } = store.searchKnowledge({ question, workArea });
+        const { articles, documents, forumPosts } = store.searchKnowledge({ question, workArea });
         const result = await answerQuestion({
           question,
           workArea,
           articles,
+          documents,
           forumPosts,
           basePath,
           env,
@@ -277,6 +341,104 @@ export function createMcpHandler({
           return toolError(`Forum topic "${topicId}" was not found.`);
         }
         return toolSuccess(result);
+      }
+
+      case 'search_technical_documents': {
+        const query = typeof input.query === 'string' ? input.query.trim() : '';
+        if (query.length < 2 || query.length > 400) {
+          return toolError('Parameter "query" must be between 2 and 400 characters.');
+        }
+        const workArea = typeof input.workArea === 'string' ? input.workArea.trim() : '';
+        const limit = Number.isInteger(Number(input.limit))
+          ? Math.max(1, Math.min(Number(input.limit), 20))
+          : 6;
+        const chunks = store.searchDocumentChunks(query, { workArea, limit });
+        return toolSuccess({
+          query,
+          workArea: workArea || null,
+          count: chunks.length,
+          documents: chunks.map((c) => ({
+            chunkId: c.chunkId,
+            documentId: c.documentId,
+            title: c.title,
+            folderName: c.folderName,
+            workArea: c.workArea,
+            source: c.source,
+            sourceUrl: c.sourceUrl,
+            heading: c.heading,
+            snippet: c.snippet,
+            content: c.content,
+            score: c.score
+          }))
+        });
+      }
+
+      case 'deep_technical_research': {
+        const question = typeof input.question === 'string' ? input.question.trim() : '';
+        if (question.length < 5 || question.length > 600) {
+          return toolError('Parameter "question" must be between 5 and 600 characters.');
+        }
+        const workArea = typeof input.workArea === 'string' ? input.workArea.trim() : '';
+        const { articles, documents, forumPosts } = store.searchKnowledge({
+          question,
+          workArea,
+          articleLimit: 5,
+          documentLimit: 6,
+          postLimit: 4
+        });
+
+        let webSources = [];
+        let aiWebBrief = '';
+        let webProvidersUsed = [];
+        let webCached = false;
+        try {
+          const research = await researchWeb({
+            question,
+            workArea,
+            maxResults: 8,
+            env,
+            fetchImpl,
+            store
+          });
+          webSources = Array.isArray(research?.webSources) ? research.webSources : [];
+          aiWebBrief = typeof research?.aiWebBrief === 'string' ? research.aiWebBrief : '';
+          webProvidersUsed = Array.isArray(research?.providersUsed) ? research.providersUsed : [];
+          webCached = Boolean(research?.cached);
+        } catch {
+          // Degrade cleanly to local KB + Technical Library + Forum synthesis
+        }
+
+        const result = await answerQuestion({
+          question,
+          workArea,
+          articles,
+          documents,
+          forumPosts,
+          webSources,
+          aiWebBrief,
+          deepResearch: true,
+          basePath,
+          env,
+          fetchImpl
+        });
+
+        const providersUsed = [...new Set([
+          ...(Array.isArray(result.providersUsed) ? result.providersUsed : []),
+          ...webProvidersUsed
+        ].filter(Boolean))];
+
+        return toolSuccess({
+          ...result,
+          question,
+          workArea: workArea || null,
+          researchMode: 'deep',
+          webSearchUsed: true,
+          webCached,
+          documentHits: documents.length,
+          webHits: webSources.length,
+          webSources,
+          providersUsed
+        });
       }
 
       default:

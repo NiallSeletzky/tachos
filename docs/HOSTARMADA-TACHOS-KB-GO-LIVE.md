@@ -178,3 +178,89 @@ If the `/kb` Node.js app ever needs to be taken offline:
    - Knowledge Base serves the built-in Five Works reference guides and offline Q&A.
    - Forum section shows the warm community card linking directly to `/forum/`.
    - Site Survey modal falls back automatically to pre-filled `mailto:info@tachos.co.uk`.
+
+---
+
+## 8. Google Drive Technical Library Sync, Live Web Research & Multi-AI Setup
+
+The upgraded TACHOS KB indexes a private **Technical Document Library** (SQLite + FTS5 BM25) alongside the Five Works guides and phpBB forum, and combines them with live authoritative web research.
+
+### 8.1 Google Drive Technical Folder Sync (Least-Privilege Service Account)
+
+1. In Google Cloud Console, enable the **Google Drive API** and create a dedicated **Service Account** (e.g. `tachos-kb-sync@<project>.iam.gserviceaccount.com`). Download its JSON key.
+2. Upload the key to a private path outside `public_html`, e.g. `/home/tachosco/apps/tachos-kb/data/gdrive-sa.json`, and lock permissions:
+   ```bash
+   chmod 600 /home/tachosco/apps/tachos-kb/data/gdrive-sa.json
+   ```
+3. In Google Drive, share **ONLY** your approved engineering/technical folders (Viewer/Read-only) with the Service Account email address. **Never** share finance, HR, payroll, legal, or confidential client credential folders — the ingestor also enforces a built-in technical allowlist and sensitive-file denylist.
+4. Add the folder IDs and Service Account path to `/home/tachosco/apps/tachos-kb/.env`:
+   ```dotenv
+   GOOGLE_SERVICE_ACCOUNT_PATH=/home/tachosco/apps/tachos-kb/data/gdrive-sa.json
+   # Or inline JSON: GOOGLE_SERVICE_ACCOUNT_JSON={"client_email":"...","private_key":"..."}
+   TACHOS_GDRIVE_FOLDER_IDS=folderId1,folderId2
+   # Optional local server technical docs folder:
+   # TACHOS_LOCAL_DOCS_DIR=/home/tachosco/apps/tachos-kb/data/local-docs
+   ```
+5. Schedule an hourly or daily cPanel cron job (**cPanel → Advanced → Cron Jobs**):
+   - **Hourly (`10 * * * *`)** or **Daily (`20 2 * * *`)**:
+   ```bash
+   /bin/bash -lc 'source /home/tachosco/nodevenv/apps/tachos-kb/22/bin/activate && cd /home/tachosco/apps/tachos-kb && node ingest/gdrive-sync.mjs >> /home/tachosco/apps/tachos-kb/tmp/gdrive-sync.log 2>&1'
+   ```
+
+### 8.2 Live Web Search & Multi-AI `.env` Keys
+
+Zero-key open-web fallback (**IETF Datatracker/RFCs, Wikipedia, DuckDuckGo Instant Answer**) and **xAI Live Search** (when `XAI_API_KEY` is set) work out of the box. Add any of the optional keys below to `/home/tachosco/apps/tachos-kb/.env` to activate additional search/AI research engines:
+
+```dotenv
+# Optional Live Web Search providers (auto-detected when set)
+TAVILY_API_KEY=tvly-...
+BRAVE_SEARCH_API_KEY=BSA...
+SERPER_API_KEY=...
+PERPLEXITY_API_KEY=pplx-...
+
+# Optional Multi-AI synthesis / custom OpenAI-compatible gateway
+GEMINI_API_KEY=AIza...
+TACHOS_CUSTOM_AI_URL=https://your-gateway.example/v1/chat/completions
+# TACHOS_CUSTOM_AI_KEY=...
+# TACHOS_CUSTOM_AI_MODEL=...
+
+# Set to 0 only if you want to disable automatic web search on thin KB hits
+# TACHOS_AUTO_WEB_SEARCH=1
+```
+
+Restart the Node.js app after editing `.env` (`touch /home/tachosco/apps/tachos-kb/tmp/restart.txt`) and verify active providers via `GET https://tachos.co.uk/kb/api/v1/status`.
+
+### 8.3 Remote HTTPS Document Push & On-Demand Sync (Admin Bearer)
+
+Both endpoints require `Authorization: Bearer $TACHOS_ADMIN_TOKEN`:
+
+```bash
+# Push one or more extracted technical documents (up to 5 MB JSON batch)
+curl -fsS -X POST https://tachos.co.uk/kb/api/v1/documents/ingest \
+  -H "Authorization: Bearer $TACHOS_ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "documents": [
+      {
+        "title": "MPO-12 Fibre Polarity SOP.md",
+        "folderName": "Cabling Standards",
+        "workArea": "cabling",
+        "mimeType": "text/markdown",
+        "text": "# MPO-12 Polarity Verification\nConfirm Type A/B/C trunk polarity and clean all end-faces per IEC 61300-3-35 before OLTS testing."
+      }
+    ]
+  }'
+
+# Trigger an on-demand Google Drive (and optional local folder) sync
+curl -fsS -X POST https://tachos.co.uk/kb/api/v1/sync/gdrive \
+  -H "Authorization: Bearer $TACHOS_ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"maxFiles":100,"dryRun":false}'
+
+# Verify public document index & deep research endpoint
+curl -fsS 'https://tachos.co.uk/kb/api/v1/documents?limit=20'
+curl -fsS -X POST https://tachos.co.uk/kb/api/v1/research \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Best practices for 400G OS2 DR4 link loss budgets and MPO cleanliness?","workArea":"cabling"}'
+```
+
