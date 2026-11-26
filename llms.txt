@@ -1,0 +1,32 @@
+# TACHOS LTD
+
+> UK data-centre and network infrastructure delivery across five disciplined project work areas — backed by an open technical knowledge base and engineering community.
+
+- Legal entity: TACHOS LTD (UK Companies House no. 17459934)
+- Website: https://tachos.co.uk/
+- Commercial & site survey enquiries: info@tachos.co.uk
+- Delivery regions: United Kingdom & Europe
+
+## The Five Works
+
+- [1 · Project Delivery](https://tachos.co.uk/project-delivery.html): Scope baselines, site readiness surveys, risk/issue control, change registers, and acceptance governance informed by BICSI Essentials of Data Center Projects (2019) and ISO/IEC 22237.
+- [2 · Rack & Stack](https://tachos.co.uk/rack-stack.html): Physical cabinet preparation, approved rack elevations, airflow and power-feed checks, serial/asset logging, and authorised power-on verification.
+- [3 · Cabling & Patch Management](https://tachos.co.uk/cabling.html): Structured copper and optical fibre installation, endpoint labelling, port matrices, and inspection/testing informed by ISO/IEC 11801 and ISO/IEC 14763-3.
+- [4 · Network Implementation](https://tachos.co.uk/network.html): Topology and addressing baselines, authorised maintenance windows, pre-checks, documented rollback triggers, and Ethernet validation informed by IEEE 802.3.
+- [5 · Documentation & Handover](https://tachos.co.uk/documentation.html): Continuous as-built capture, test-evidence compilation, snag closeout, O&M transfer, and formal client acceptance sign-off.
+
+## Technical Knowledge Base & Community
+
+- [Homepage Knowledge Base & Assistant](https://tachos.co.uk/#knowledge-base): Engineer-verified and AI-drafted (pending review) guides with grounded Q&A and citations.
+- [Technical Community Forum](https://tachos.co.uk/forum/): Practical discussions on data centres, optical fibre, structured cabling, rack deployments, and network commissioning.
+
+## Machine-Readable Endpoints
+
+- Knowledge Base Articles API: `https://tachos.co.uk/kb/api/v1/articles`
+- Grounded Technical Q&A API: `https://tachos.co.uk/kb/api/v1/ask`
+- Remote MCP Endpoint (Streamable HTTP): `https://tachos.co.uk/kb/mcp`
+- XML Sitemap: `https://tachos.co.uk/sitemap.xml`
+
+## Working Basis
+
+Published TACHOS technical guides are prototype engineering outlines to adapt and approve per contract — not executable site procedures or a standalone claim of standards compliance. Always confirm against current client designs, site RAMS, and manufacturer instructions.

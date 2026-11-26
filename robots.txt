@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /forum/adm/
+Disallow: /forum/cache/
+Disallow: /forum/config/
+Disallow: /forum/files/
+Disallow: /forum/store/
+Disallow: /forum/ucp.php
+Disallow: /forum/mcp.php
+Disallow: /forum/posting.php
+Disallow: /kb/api/v1/admin/
+
+Sitemap: https://tachos.co.uk/sitemap.xml
