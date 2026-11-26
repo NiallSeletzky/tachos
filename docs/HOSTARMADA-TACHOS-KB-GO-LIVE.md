@@ -59,18 +59,26 @@ Create `/home/tachosco/apps/tachos-kb/.env` with strict permissions (`chmod 600 
 ```dotenv
 # Core runtime
 NODE_ENV=production
-TACHOS_SITE_ORIGIN=https://tachos.co.uk
-TACHOS_DATA_DIR=/home/tachosco/apps/tachos-kb/data
+TACHOS_BASE_PATH=/kb
+TACHOS_PUBLIC_ORIGIN=https://tachos.co.uk
+TACHOS_DB_PATH=/home/tachosco/apps/tachos-kb/data/tachos-kb.sqlite
 
-# AI Technical Assistant & Curator (xAI / Grok or compatible provider)
+# AI Technical Assistant & Curator (xAI Grok, Anthropic, or OpenAI — auto-detected)
 XAI_API_KEY=your-xai-api-key-here
 XAI_MODEL=grok-3-mini
 
-# Admin token for approving AI-drafted articles & viewing commercial enquiries
+# Admin Bearer token for approving AI-drafted articles & viewing commercial enquiries
 TACHOS_ADMIN_TOKEN=generate-a-long-random-64-char-hex-secret
 
-# Optional phpBB bridge settings (if overriding defaults)
+# phpBB community bridge (read-only on all boards by default)
 TACHOS_FORUM_URL=https://tachos.co.uk/forum
+
+# Optional: enable AI replies & curator briefs strictly on a dedicated AI phpBB board
+# TACHOS_AI_BOARD_ID=5
+# TACHOS_PHPBB_BOT_USER=TachosAI
+# TACHOS_PHPBB_BOT_PASS=your-dedicated-bot-password
+# TACHOS_CURATOR_POST_BRIEF=1
+# TACHOS_AI_BRIEF_TOPIC_ID=
 ```
 
 Generate a strong `TACHOS_ADMIN_TOKEN` via cPanel Terminal:
