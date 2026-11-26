@@ -11,6 +11,8 @@ deployment:
     - /bin/cp -f sequence.js "$DEPLOYPATH"
     - /bin/cp -f tachos-forum-home.css "$DEPLOYPATH"
     - /bin/cp -f tachos-forum-home.js "$DEPLOYPATH"
+    - /bin/cp -f tachos-kb.css "$DEPLOYPATH"
+    - /bin/cp -f tachos-kb.js "$DEPLOYPATH"
     - /bin/cp -f headline-rotation.js "$DEPLOYPATH"
     - /bin/cp -f project-delivery.html "$DEPLOYPATH"
     - /bin/cp -f rack-stack.html "$DEPLOYPATH"
@@ -18,4 +20,9 @@ deployment:
     - /bin/cp -f network.html "$DEPLOYPATH"
     - /bin/cp -f documentation.html "$DEPLOYPATH"
     - /bin/cp -f control-room-prototype.html "$DEPLOYPATH"
+    - /bin/cp -f sitemap.xml "$DEPLOYPATH"
+    - /bin/cp -f robots.txt "$DEPLOYPATH"
+    - /bin/cp -f llms.txt "$DEPLOYPATH"
     - /bin/cp -f assets/five-works.webp "$DEPLOYPATH/assets/"
+    - export KBAPP=/home/tachosco/apps/tachos-kb
+    - 'if [ -d "$KBAPP" ] && [ -d kb ]; then if command -v rsync >/dev/null 2>&1; then rsync -a --exclude="data/" --exclude=".env" --exclude=".env.*" --exclude="node_modules/" --exclude="tmp/" --exclude="app.cjs" kb/ "$KBAPP/"; else for item in kb/*; do base=$(basename "$item"); case "$base" in data|node_modules|tmp|app.cjs|.env|.env.*) ;; *) /bin/cp -rf "$item" "$KBAPP/" ;; esac; done; fi; if [ -f kb/passenger.cjs ]; then /bin/cp -f kb/passenger.cjs "$KBAPP/app.cjs"; fi; /bin/mkdir -p "$KBAPP/data" "$KBAPP/tmp"; /bin/touch "$KBAPP/tmp/restart.txt"; fi'

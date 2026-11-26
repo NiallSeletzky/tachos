@@ -1,0 +1,16 @@
+{
+  "name": "tachos-technical-kb",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TACHOS LTD AI-Assisted Technical Community & Knowledge Base (zero-dependency Node 22 + node:sqlite)",
+  "main": "passenger.cjs",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "node server.mjs",
+    "curator": "node agents/tachos-curator.mjs"
+  }
+}

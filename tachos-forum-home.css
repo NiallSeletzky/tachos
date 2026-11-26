@@ -119,8 +119,8 @@
   .tachos-board__link { transition: none; }
 }
 
-/* Static home release: forum follows the five heroes and precedes the shared footer. */
-.home .tachos-board{width:100%;margin-top:32px}
+/* Static home release: sections flow seamlessly after the five heroes and precede the shared footer. */
+.home .tachos-board{width:100%;margin-top:0}
 .home .company-footer{max-width:none;margin-top:0;border-top:1px solid #dfd0bd}
 .tachos-board__frame{overflow:auto}
-@media(max-width:600px){.home .tachos-board{margin-top:24px}}
+@media(max-width:600px){.home .tachos-board{margin-top:0}}
